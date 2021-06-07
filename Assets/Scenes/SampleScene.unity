@@ -258,8 +258,8 @@ MonoBehaviour:
     type: 3}
   size: 12
   bombs: 10
-  RightKey: 275
-  LeftKey: 276
+  RightKey: 324
+  LeftKey: 323
 --- !u!114 &1460782808
 MonoBehaviour:
   m_ObjectHideFlags: 0

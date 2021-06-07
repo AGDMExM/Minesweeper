@@ -7,47 +7,100 @@ public class Grid : MonoBehaviour
     [SerializeField] private Cell cellPrefab;
     [SerializeField] private int size = 12;
     [SerializeField] private int bombs = 10;
-    public KeyCode RightKey;
-    public KeyCode LeftKey;
     private Cell[,] field;
+
+    private bool firstClick = true;
 
     private void Awake()
     {
         InitializeField();
-        InitializeBombs();
-        InitializeNeighboursBombsCount();
+        
     }
 
-    public void CellClick(Cell cell)
+    private void Update()
     {
-        if (cell.isBorder)
-        {
-            return;
-        }
-
-        if (cell.isBomb)
-        {
-            OpenAll();
-            Debug.LogError("Game over");
-            return;
-        }
-
-
-
-        if (cell.neighbourBombs == 0)
-        {
-            OpenNeighbourFree(cell);
-            return;
-        }
-        cell.Open();
-
-        if (GetCountCloseCell() == 10 + 44)
+        if (GetCountCloseCell() == 10 + 44) // 10 - bombs, 44 - count border cells
         {
             OpenAll();
             Debug.LogError("You Win");
             return;
         }
-        
+    }
+
+    public void CellClick(Cell cell)
+    {
+        if (Input.GetKeyUp(KeyCode.Mouse0))
+        {
+            if (cell.isBorder)
+            {
+                return;
+            }
+
+            if (firstClick)
+            {
+                firstClick = false;
+                List<Cell> arrayForBomb = new List<Cell>();
+                List<int> arrNumberPosCells = new List<int>();
+
+                for (int i = 0; i < size * size - 1; i++)
+                {
+                    if(cell.x * size + cell.y != i)
+                        arrNumberPosCells.Add(i);
+                }
+
+                while(arrNumberPosCells.Count - 1 != 0)
+                {
+                    System.Random rnd = new System.Random();
+                    int posCell = arrNumberPosCells[rnd.Next(0, arrNumberPosCells.Count - 1)];
+                    //int i = posCell / size;
+                    //int j = posCell % size;
+                    //if (posCell / size != cell.y && posCell % size != cell.x)
+                    arrayForBomb.Add(field[posCell / size, posCell % size]);
+                    arrNumberPosCells.Remove(posCell);
+                }
+
+                InitializeBombs(arrayForBomb);
+                InitializeNeighboursBombsCount();
+            }
+
+            if (!cell.isFlag)
+            {
+                if (cell.isBomb)
+                {
+                    OpenAll();
+                    Debug.LogError("Game over");
+                    return;
+                }
+
+                if (cell.neighbourBombs == 0)
+                {
+                    OpenNeighbourFree(cell);
+                    return;
+                }
+                cell.Open();
+
+                if (GetCountCloseCell() == 10 + 44)
+                {
+                    OpenAll();
+                    Debug.LogError("You Win");
+                    return;
+                }
+            }
+        }
+
+        if (Input.GetKeyUp(KeyCode.Mouse1))
+        {
+            if (!cell.isOpen && !cell.isBorder)
+            {
+                CellFlag(cell);
+            }
+        }
+
+    }
+
+    private void CellFlag(Cell cell)
+    {
+        cell.SetFlag();
     }
     
     private int GetCountCloseCell()
@@ -69,30 +122,31 @@ public class Grid : MonoBehaviour
         {
             for(int j=0; j < size; j++)
             {
-                field[i, j] = Instantiate(cellPrefab, transform);
-                field[i, j].x = i;
-                field[i, j].y = j;
+                Cell cell = field[i, j];
+                cell = Instantiate(cellPrefab, transform);
+                cell.x = i;
+                cell.y = j;
                 if(i == 0 || j == 0 || i == size - 1 || j == size - 1)
                 {
-                    field[i, j].SetCharBorder();
-                    field[i, j].SetBorder();
+                    cell.SetCharBorder();
+                    cell.SetBorder();
                 }
+                field[i, j] = cell;
             }
         }
     }
 
-    private void InitializeBombs()
+    private void InitializeBombs(List<Cell> listForBomb)
     {
         int count = 0;
-        while(count < bombs)
+        while (count < bombs)
         {
-            int position = Random.Range(0, size * size);
-            int x = position / size;
-            int y = position % size;
-
-            if(!field[x, y].isBomb && !field[x, y].isBorder)
+            System.Random rnd = new System.Random();
+            int pos = rnd.Next(0, listForBomb.Count - 1);
+            if (!listForBomb[pos].isBorder)
             {
-                field[x, y].SetBomb();
+                listForBomb[pos].SetBomb();
+                listForBomb.Remove(listForBomb[pos]);
                 count++;
             }
         }
@@ -111,12 +165,13 @@ public class Grid : MonoBehaviour
 
     private int GetNeighboursBombsCount(int x, int y)
     {
+        
         int count = 0;
         for(int i= -1; i <= 1; i++)
         {
             for(int j = -1; j <= 1; j++)
             {
-                if(x + i < 0 || x + i >= size || y + j < 0 || y + j >= size)
+                if (IsOutsideGrid(x, y))
                     continue;
 
                 if(field[x + i, y + j].isBomb)
@@ -124,6 +179,11 @@ public class Grid : MonoBehaviour
             }
         }
         return count;
+    }
+
+    private bool IsOutsideGrid(int x, int y)
+    {
+        return x - 1 < 0 || x + 1 >= size || y - 1 < 0 || y + 1 >= size;
     }
 
     private void OpenAll()
@@ -150,18 +210,21 @@ public class Grid : MonoBehaviour
             if(current.neighbourBombs > 0)
                 continue;
 
-            for(int i = -1; i <= 1; i++)
-                for(int j = -1; j <= 1; j++)
+            for (int i = -1; i <= 1; i++)
+            {
+                for (int j = -1; j <= 1; j++)
                 {
                     int x = current.x + i;
                     int y = current.y + j;
+                    Cell cellInBorder = field[x, y];
 
-                    if(x < 0 || x >= size || y < 0 || y >= size)
+                    if (x < 0 || x >= size || y < 0 || y >= size)
                         continue;
 
-                    if(!field[x, y].isBomb && !field[x, y].isOpen && !field[x, y].isBorder)
-                        visite.Add(field[x, y]);
+                    if (!cellInBorder.isBomb && !cellInBorder.isOpen && !cellInBorder.isBorder)
+                        visite.Add(cellInBorder);
                 }
+            }
         }
     }
 }
